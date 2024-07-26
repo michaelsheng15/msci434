@@ -1,86 +1,100 @@
 import gurobipy as gp
 from gurobipy import GRB
 
-# Sets
-Retailers = ['R1', 'R2', 'R3']
-Suppliers = ['S1', 'S2']
-Warehouses = ['W1']
+suppliers = ['S1', 'S2']
+warehouses = ['W1', 'W2']
+retailers = ['R1', 'R2', 'R3', 'R4']
 
-# Parameters
+
+# PARAMETERS
 p = 25  # Unit product price
 c = 10  # Unit production cost
-c_st = {('S1', 'W1'): 5, ('S2', 'W1'): 8, ('W1', 'R1'): 6, ('W1', 'R2'): 7, ('W1', 'R3'): 9}  # Transportation costs
-b_r = {'R1': 100, 'R2': 150, 'R3': 200}  # Demand for each retailer
-m_s = {'S1': 250, 'S2': 300}  # Maximum supply capacity of each supplier
-m_td = {'W1': 450}  # Maximum transshipment quantity through the warehouse
 
-# Create the model
-model = gp.Model("SupplyChainWithWarehouseOptimization")
+transport_cost_matrix = {
+    ('S1', 'W1'): 5, 
+    ('S2', 'W1'): 8, 
+    ('S1', 'W2'): 7, 
+    ('S2', 'W2'): 9,
+    ('W1', 'R1'): 6, 
+    ('W1', 'R2'): 7, 
+    ('W1', 'R3'): 9, 
+    ('W1', 'R4'): 10,
+    ('W2', 'R1'): 6, 
+    ('W2', 'R2'): 5, 
+    ('W2', 'R3'): 8, 
+    ('W2', 'R4'): 7
+}  # transport cost matrix
+b_r = {'R1': 100, 'R2': 150, 'R3': 200, 'R4': 180}  # random retailer demand
+m_s = {'S1': 350, 'S2': 400}  # max production capacity
+m_td = {'W1': 500, 'W2': 350}  # max warehouse capacity
 
-# Decision variables
-x_sw = model.addVars(Suppliers, Warehouses, name="x_sw", vtype=GRB.CONTINUOUS, lb=0)  # Quantity shipped to warehouse
-x_wr = model.addVars(Warehouses, Retailers, name="x_wr", vtype=GRB.CONTINUOUS, lb=0)  # Quantity shipped from warehouse
-s_f = model.addVars(Suppliers, name="s_f", vtype=GRB.CONTINUOUS, lb=0)  # Production quantity of suppliers
+# BUILDING THE MODEL
+model = gp.Model("Production & Transportation Optimization Model")
 
-# Objective: Maximize profit
+# decision vars
+x_sw = model.addVars(suppliers, warehouses, name="x_sw", vtype=GRB.CONTINUOUS, lb=0)  # Q shipped from suppliers to warehouses
+x_wr = model.addVars(warehouses, retailers, name="x_wr", vtype=GRB.CONTINUOUS, lb=0)  # Q shipped from warehouses to retailers
+s_f = model.addVars(suppliers, name="s_f", vtype=GRB.CONTINUOUS, lb=0)  # amount produced by suppliers
+
+# objective is to maximize profit
 model.setObjective(
-    gp.quicksum(p * b_r[r] for r in Retailers) -
-    gp.quicksum(c_st[s, w] * x_sw[s, w] for s in Suppliers for w in Warehouses) -  # Costs from suppliers to warehouse
-    gp.quicksum(c_st[w, r] * x_wr[w, r] for w in Warehouses for r in Retailers) -  # Costs from warehouse to retailers
-    gp.quicksum(c * s_f[f] for f in Suppliers),  # Production costs
+    gp.quicksum(p * b_r[r] for r in retailers) - # profit
+    gp.quicksum(transport_cost_matrix[s, w] * x_sw[s, w] for s in suppliers for w in warehouses) -  # supplier to warehouse transport costs
+    gp.quicksum(transport_cost_matrix[w, r] * x_wr[w, r] for w in warehouses for r in retailers) -  # warehouse to retailer transport costs
+    gp.quicksum(c * s_f[f] for f in suppliers),  # cost of production
     GRB.MAXIMIZE
 )
 
-# Constraints
-# Supply must meet or exceed demand
+# CONSTRAINTS
+# Total amount produced must be greater than or equal to total retail demand
 model.addConstr(
-    gp.quicksum(s_f[f] for f in Suppliers) >= gp.quicksum(b_r[r] for r in Retailers), "SupplyDemandBalance"
+    gp.quicksum(s_f[f] for f in suppliers) >= gp.quicksum(b_r[r] for r in retailers), "SupplyDemandBalance"
 )
 
-# Flow conservation for suppliers (Supply to Warehouse)
-for f in Suppliers:
+# Amount shipped from supplier to warehouse is the total amount produced
+for f in suppliers:
     model.addConstr(
-        gp.quicksum(x_sw[f, w] for w in Warehouses) == s_f[f], f"FlowConservation_{f}"
+        gp.quicksum(x_sw[f, w] for w in warehouses) == s_f[f], f"FlowConservation_{f}"
     )
 
-# Supply capacity constraints
-for f in Suppliers:
+# Amount produced of each supplier cannot exceed maximum capacity of supplier
+for f in suppliers:
     model.addConstr(
         s_f[f] <= m_s[f], f"SupplyCapacity_{f}"
     )
 
-# Demand fulfillment at the retailer level
-for r in Retailers:
+# Amount shipped is equal to the demand of each retailer
+for r in retailers:
     model.addConstr(
-        gp.quicksum(x_wr[w, r] for w in Warehouses) == b_r[r], f"DemandFulfillment_{r}"
+        gp.quicksum(x_wr[w, r] for w in warehouses) == b_r[r], f"DemandFulfillment_{r}"
     )
 
-# Transshipment conservation at the warehouse level
-for w in Warehouses:
+# Amount shipped into each warehouse is equal to the amount shipped out of each node
+for w in warehouses:
     model.addConstr(
-        gp.quicksum(x_sw[s, w] for s in Suppliers) == gp.quicksum(x_wr[w, r] for r in Retailers), f"WarehouseBalance_{w}"
+        gp.quicksum(x_sw[s, w] for s in suppliers) == gp.quicksum(x_wr[w, r] for r in retailers), f"WarehouseBalance_{w}"
     )
 
-# Transshipment capacity at the warehouse
-for w in Warehouses:
+# Amount shipped into each warehouse is less than or equal to maximum capacity of the warehouse
+for w in warehouses:
     model.addConstr(
-        gp.quicksum(x_wr[w, r] for r in Retailers) <= m_td[w], f"TransshipmentCapacity_{w}"
+        gp.quicksum(x_wr[w, r] for r in retailers) <= m_td[w], f"TransshipmentCapacity_{w}"
     )
 
-# Optimize the model
 model.optimize()
 
-# Check if the model found an optimal solution
-if model.status == GRB.OPTIMAL:
-    print(f"Optimal Total Profit: {model.objVal}")
+model.printStats()
 
-    # Print the optimal shipment quantities
+if model.status == GRB.OPTIMAL:
+    print("\n\nRESULTS:")
+    print(f"\nOptimal Total Profit: {model.objVal}")
+
     print("\nOptimal shipment quantities:")
-    for f in Suppliers:
-        for w in Warehouses:
+    for f in suppliers:
+        for w in warehouses:
             print(f"  From {f} to {w}: {x_sw[f, w].x} units")
-    for w in Warehouses:
-        for r in Retailers:
+    for w in warehouses:
+        for r in retailers:
             print(f"  From {w} to {r}: {x_wr[w, r].x} units")
 else:
     print("No optimal solution found.")
