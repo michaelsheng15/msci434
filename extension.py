@@ -6,8 +6,9 @@ warehouses = ['W1', 'W2']
 retailers = ['R1', 'R2', 'R3', 'R4']
 
 # PARAMETERS
-p = 25  # Unit product price
-c = 10  # Unit production cost
+p = 25  
+c = 10  
+h = 0.5
 
 transport_cost_matrix = {
     ('S1', 'W1'): 5, 
@@ -40,6 +41,7 @@ model.setObjective(
     gp.quicksum(p * b_r[r] for r in retailers) - # profit
     gp.quicksum(transport_cost_matrix[s, w] * x_sw[s, w] for s in suppliers for w in warehouses) -  # supplier to warehouse transport costs
     gp.quicksum(transport_cost_matrix[w, r] * x_wr[w, r] for w in warehouses for r in retailers) -  # warehouse to retailer transport costs
+    gp.quicksum(h * x_sw[s, w] for s in suppliers for w in warehouses) - #warehouse holding cost
     gp.quicksum(c * s_f[f] for f in suppliers),  # cost of production
     GRB.MAXIMIZE
 )
