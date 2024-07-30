@@ -86,11 +86,11 @@ print(f"\nOptimal Total Profit: {model.objVal}")
 print("\nOptimal shipment quantities:")
 for f in suppliers:
     for w in warehouses:
-        print(f"  From {f} to {w}: {x_sw[f, w].x} units")
+        print(f"From {f} to {w}: {x_sw[f, w].x} units")
 for w in warehouses:
     for r in retailers:
-        print(f"  From {w} to {r}: {x_wr[w, r].x} units")
+        print(f"From {w} to {r}: {x_wr[w, r].x} units")
             
 print("\nOptimal production quantities:")
 for s in suppliers:
-    print(f"  Suppliers {s} should produce: {s_f[s].x} units")
+    print(f"Suppliers {s} should produce: {s_f[s].x} units")
