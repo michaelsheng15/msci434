@@ -30,7 +30,7 @@ m_s = {'S1': 350, 'S2': 400}  # max production capacity
 m_td = {'W1': 500, 'W2': 350}  # max warehouse capacity
 
 # BUILDING THE MODEL
-model = gp.Model("Production & Transportation Optimization Model")
+model = gp.Model("Production & Transportation Optimization EXTENDED Model")
 
 # decision vars
 x_sw = model.addVars(suppliers, warehouses, name="x_sw", vtype=GRB.CONTINUOUS, lb=0)  # Q shipped from suppliers to warehouses
