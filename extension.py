@@ -9,7 +9,7 @@ retailers = ['R1', 'R2', 'R3', 'R4']
 # PARAMETERS
 p = 25  
 c = 10  
-h = 0.5
+h = 0.5 # NEW HOLDING COST EXTENSION
 
 transport_cost_matrix = {
     ('S1', 'W1'): 5, 
